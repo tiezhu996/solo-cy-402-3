@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SeedService 启动时幂等写入预置数据。
@@ -73,9 +73,10 @@ var presetDocuments = []model.Document{
 	{ID: 3, Title: "一审判决书", FileType: "judgment", FileURL: "/uploads/case3_judgment.pdf", CaseID: 3, UploaderID: 2},
 }
 
-// SeedPresetDocuments 幂等补齐预置文档：每次启动执行。
-// 记录缺失才按原始 ID 与案件归属补建，文件缺失才写入占位文件；
-// 已存在的记录与文件一律跳过，重复启动不产生重复记录或重复文件。
+// SeedPresetDocuments 幂等补齐预置文档：每次启动执行，并发安全。
+// 记录用 INSERT ... ON CONFLICT DO NOTHING 原子去重，随后无条件重读——
+// 多实例同时启动时只有一份记录生效，竞态落败方读取胜出方的记录继续启动；
+// 文件由 EnsureFile 原子落位，已存在内容绝不改写，重复启动不产生重复记录或重复文件。
 func (s *SeedService) SeedPresetDocuments() error {
 	for _, p := range presetDocuments {
 		// 案件不存在时跳过（本地开发库可能只有部分案件），避免产生错归属记录。
@@ -87,28 +88,23 @@ func (s *SeedService) SeedPresetDocuments() error {
 			s.logger.Warn(constants.LogSeedDocumentBackfill, "document_id", p.ID, "case_id", p.CaseID, "reason", "case missing, skipped")
 			continue
 		}
-		fileURL := p.FileURL
+		// 并发安全写入：冲突时不报错、不改动已有记录。
+		doc := p
+		doc.UploadTime = time.Now()
+		if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&doc).Error; err != nil {
+			return fmt.Errorf("seed preset documents: upsert document %d: %w", p.ID, err)
+		}
+		// 无论本次是否真正插入都重新读取：竞态中落败的一方读取胜出方的记录，
+		// 以现有记录的文件地址为准继续启动。
 		var existing model.Document
-		err := s.db.First(&existing, p.ID).Error
-		switch {
-		case errors.Is(err, gorm.ErrRecordNotFound):
-			doc := p
-			doc.UploadTime = time.Now()
-			if err := s.db.Create(&doc).Error; err != nil {
-				return fmt.Errorf("seed preset documents: create document %d: %w", p.ID, err)
-			}
-			s.logger.Info(constants.LogSeedDocumentBackfill, "document_id", p.ID, "action", "record created")
-		case err != nil:
-			return fmt.Errorf("seed preset documents: find document %d: %w", p.ID, err)
-		default:
-			// 记录已存在：以现有记录的文件地址为准，保留原文档标识，不做任何改动。
-			fileURL = existing.FileURL
+		if err := s.db.First(&existing, p.ID).Error; err != nil {
+			return fmt.Errorf("seed preset documents: reload document %d: %w", p.ID, err)
 		}
-		path, err := util.ResolveUploadPath(s.uploadDir, fileURL)
+		path, err := util.ResolveUploadPath(s.uploadDir, existing.FileURL)
 		if err != nil {
-			return fmt.Errorf("seed preset documents: resolve %s: %w", fileURL, err)
+			return fmt.Errorf("seed preset documents: resolve %s: %w", existing.FileURL, err)
 		}
-		created, err := util.EnsureFile(path, util.PlaceholderPDF(presetPlaceholderLines(p, fileURL)))
+		created, err := util.EnsureFile(path, util.PlaceholderPDF(presetPlaceholderLines(existing, existing.FileURL)))
 		if err != nil {
 			return fmt.Errorf("seed preset documents: ensure file %s: %w", path, err)
 		}

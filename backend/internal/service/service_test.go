@@ -1,10 +1,15 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"cylawcase/internal/constants"
 	"cylawcase/internal/model"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func TestCanFlow(t *testing.T) {
@@ -133,5 +138,29 @@ func TestMatchBillingClient(t *testing.T) {
 		if got := MatchBillingClient(tc.caseClientID, tc.clientID); got != tc.want {
 			t.Errorf("MatchBillingClient(%d, %d) = %v, want %v", tc.caseClientID, tc.clientID, got, tc.want)
 		}
+	}
+}
+
+func TestPresetDocumentUpsertSQL(t *testing.T) {
+	// 预置文档写入必须使用 ON CONFLICT DO NOTHING：
+	// 多实例同时启动时只有一份记录生效，不会因主键冲突导致实例退出。
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  "host=127.0.0.1 port=1 user=u password=p dbname=d sslmode=disable",
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{DryRun: true})
+	if err != nil {
+		t.Skipf("cannot open dry-run db: %v", err)
+	}
+	doc := presetDocuments[0]
+	tx := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&doc)
+	if tx.Error != nil {
+		t.Skipf("dry-run create failed: %v", tx.Error)
+	}
+	sql := tx.Statement.SQL.String()
+	if !strings.Contains(sql, "ON CONFLICT DO NOTHING") {
+		t.Errorf("upsert SQL missing ON CONFLICT DO NOTHING: %s", sql)
+	}
+	if !strings.Contains(sql, `"documents"`) {
+		t.Errorf("upsert SQL should target documents table: %s", sql)
 	}
 }

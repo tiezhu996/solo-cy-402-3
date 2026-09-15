@@ -1,25 +1,48 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// EnsureFile 文件不存在时写入给定内容，已存在则跳过（幂等）。
-// 返回是否真正写入了文件；重复调用不产生重复文件，也不覆盖已有内容。
+// EnsureFile 并发安全且幂等地保证文件存在：不存在才写入，已存在绝不改写。
+// 内容先完整写入同目录临时文件，再用硬链接原子落位——并发执行时只有一个
+// 写入者生效，最终只得到一个完整文件；其他并发方与后续重试都安全跳过。
 func EnsureFile(path string, content []byte) (bool, error) {
 	if _, err := os.Stat(path); err == nil {
 		return false, nil
 	} else if !os.IsNotExist(err) {
 		return false, fmt.Errorf("stat file: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return false, fmt.Errorf("create file dir: %w", err)
 	}
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		return false, fmt.Errorf("write file: %w", err)
+	tmp, err := os.CreateTemp(dir, ".ensure-*")
+	if err != nil {
+		return false, fmt.Errorf("create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // 链接成功后临时文件即多余副本，无论如何都清理
+	if _, err := tmp.Write(content); err != nil {
+		tmp.Close()
+		return false, fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return false, fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Chmod(tmpName, 0o644); err != nil {
+		return false, fmt.Errorf("chmod temp file: %w", err)
+	}
+	// 硬链接原子生效：目标已存在时失败，保证已有文件内容不被改写。
+	if err := os.Link(tmpName, path); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("link file into place: %w", err)
 	}
 	return true, nil
 }

@@ -2,6 +2,7 @@ import { Card, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { DocumentTypeText } from '@/constants/document'
 import { formatDateTime } from '@/utils/dateFormat'
+import { openDocument } from '@/api/document'
 import type { DocumentItem } from '@/types'
 
 export default function DocumentCard({ item, extra }: { item: DocumentItem; extra?: ReactNode }) {
@@ -13,7 +14,7 @@ export default function DocumentCard({ item, extra }: { item: DocumentItem; extr
       <Typography.Paragraph type="secondary" style={{ marginBottom: 4 }}>
         上传时间：{formatDateTime(item.upload_time)}
       </Typography.Paragraph>
-      <Typography.Link href={item.file_url} target="_blank">查看/下载</Typography.Link>
+      <Typography.Link onClick={() => openDocument(item.id)}>查看/下载</Typography.Link>
     </Card>
   )
 }

@@ -33,16 +33,17 @@ func TestSetupRoutes(t *testing.T) {
 	)
 	engine := r.Setup()
 	want := map[string]bool{
-		"GET /api/v1/cases/:id":            false,
-		"GET /api/v1/cases/:id/members":    false,
-		"PUT /api/v1/cases/:id/members":    false,
-		"POST /api/v1/cases/:id/assign":    false,
-		"POST /api/v1/cases/:id/status":    false,
-		"GET /api/v1/users/assistants":     false,
-		"GET /api/v1/billings/summary":     false,
-		"GET /api/v1/billings/by-case/:id": false,
-		"POST /api/v1/upload/file":         false,
-		"POST /api/v1/upload/avatar":       false,
+		"GET /api/v1/cases/:id":              false,
+		"GET /api/v1/cases/:id/members":      false,
+		"PUT /api/v1/cases/:id/members":      false,
+		"POST /api/v1/cases/:id/assign":      false,
+		"POST /api/v1/cases/:id/status":      false,
+		"GET /api/v1/users/assistants":       false,
+		"GET /api/v1/billings/summary":       false,
+		"GET /api/v1/billings/by-case/:id":   false,
+		"GET /api/v1/documents/:id/download": false,
+		"POST /api/v1/upload/file":           false,
+		"POST /api/v1/upload/avatar":         false,
 	}
 	for _, ri := range engine.Routes() {
 		key := ri.Method + " " + ri.Path

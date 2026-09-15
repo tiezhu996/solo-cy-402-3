@@ -55,7 +55,7 @@ func main() {
 	userSvc := service.NewUserService(userRepo, logger)
 	clientSvc := service.NewClientService(clientRepo, caseRepo, logger)
 	caseSvc := service.NewCaseService(caseRepo, clientRepo, userRepo, logger)
-	documentSvc := service.NewDocumentService(documentRepo, caseRepo, logger)
+	documentSvc := service.NewDocumentService(documentRepo, caseRepo, cfg.UploadDir, logger)
 	billingSvc := service.NewBillingService(billingRepo, caseRepo, clientRepo, logger)
 
 	userHandler := handler.NewUserHandler(userSvc, logger)

@@ -17,6 +17,11 @@ export default defineConfig({
         target: 'http://localhost:29069',
         changeOrigin: true,
       },
+      // 头像等公开静态资源（案件文件不经此入口，统一走 /api 授权下载）
+      '/uploads': {
+        target: 'http://localhost:29069',
+        changeOrigin: true,
+      },
     },
   },
 })

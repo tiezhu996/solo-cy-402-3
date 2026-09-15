@@ -2,6 +2,7 @@ package router
 
 import (
 	"log/slog"
+	"path/filepath"
 
 	"cylawcase/internal/config"
 	"cylawcase/internal/handler"
@@ -55,7 +56,9 @@ func (r *Router) Setup() *gin.Engine {
 	engine.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
 	engine.GET("/api/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
 	engine.GET("/api/v1/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
-	engine.Static("/uploads", r.cfg.UploadDir)
+	// 仅头像目录公开静态服务（个人资料图片，非案件资料）；
+	// 案件文件一律经 GET /api/v1/documents/:id/download 按成员关系授权下载，不再暴露公开地址。
+	engine.Static("/uploads/avatars", filepath.Join(r.cfg.UploadDir, "avatars"))
 
 	v1 := engine.Group("/api/v1")
 	r.registerAuthRoutes(v1)

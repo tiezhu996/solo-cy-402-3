@@ -23,6 +23,7 @@ const (
 	LogDocumentUploadSuccess   = "document upload success"
 	LogDocumentUploadFailed    = "document upload failed"
 	LogDocumentDeleteSuccess   = "document delete success"
+	LogDocumentDownloadSuccess = "document download success"
 	LogBillingCreateSuccess    = "billing create success"
 	LogBillingCreateFailed     = "billing create failed"
 	LogBillingPaidSuccess      = "billing paid success"

@@ -12,14 +12,15 @@ import (
 
 // DocumentService 文档业务逻辑。
 type DocumentService struct {
-	repo     *repository.DocumentRepository
-	caseRepo *repository.CaseRepository
-	logger   *slog.Logger
+	repo      *repository.DocumentRepository
+	caseRepo  *repository.CaseRepository
+	uploadDir string
+	logger    *slog.Logger
 }
 
 // NewDocumentService 构造文档服务。
-func NewDocumentService(repo *repository.DocumentRepository, caseRepo *repository.CaseRepository, logger *slog.Logger) *DocumentService {
-	return &DocumentService{repo: repo, caseRepo: caseRepo, logger: logger}
+func NewDocumentService(repo *repository.DocumentRepository, caseRepo *repository.CaseRepository, uploadDir string, logger *slog.Logger) *DocumentService {
+	return &DocumentService{repo: repo, caseRepo: caseRepo, uploadDir: uploadDir, logger: logger}
 }
 
 // Create 上传文档。仅管理员/主办/协办律师可维护文档，助理只读。
@@ -47,6 +48,25 @@ func (s *DocumentService) ListByCase(caseID, userID uint64, role string) ([]mode
 		return nil, err
 	}
 	return s.repo.ListByCase(caseID)
+}
+
+// Download 下载案件文件。与文档列表使用同一成员关系（任意案件成员），管理员全局；
+// 逐请求校验，成员被移出后旧文件地址立即失效。
+func (s *DocumentService) Download(id, userID uint64, role string) (string, error) {
+	d, err := s.repo.FindByID(id)
+	if err != nil {
+		return "", util.Wrap(err, "Document[id=%d] download find failed", id)
+	}
+	if _, _, err := CheckCaseAccess(s.caseRepo, d.CaseID, userID, role, AccessAssistant); err != nil {
+		s.logger.Warn(constants.LogCaseAccessDenied, "case_id", d.CaseID, "user_id", userID, "action", "document_download")
+		return "", err
+	}
+	path, err := util.ResolveUploadPath(s.uploadDir, d.FileURL)
+	if err != nil {
+		return "", util.Wrap(err, "Document[id=%d] download resolve failed", id)
+	}
+	s.logger.Info(constants.LogDocumentDownloadSuccess, "document_id", id, "user_id", userID)
+	return path, nil
 }
 
 // List 文档中心分页查询；memberID > 0 时仅返回该用户为成员的案件文档。

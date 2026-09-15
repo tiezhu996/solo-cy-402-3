@@ -56,6 +56,21 @@ func (h *DocumentHandler) ListByCase(c *gin.Context) {
 	OK(c, list)
 }
 
+// Download 下载案件文件。与文档列表同一成员关系，逐请求校验成员身份。
+func (h *DocumentHandler) Download(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Document[id] download: invalid id")
+		return
+	}
+	path, err := h.svc.Download(id, middleware.GetUserID(c), middleware.GetUserRole(c))
+	if err != nil {
+		h.wrapError(c, err, "Document download failed")
+		return
+	}
+	c.File(path)
+}
+
 // List 文档中心分页查询。非管理员仅返回其为成员的案件文档。
 func (h *DocumentHandler) List(c *gin.Context) {
 	var q dto.PageQuery

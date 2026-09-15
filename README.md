@@ -156,6 +156,7 @@ cy-402/
 | GET | /api/v1/documents | 文档中心分页列表 |
 | POST | /api/v1/documents | 上传文档记录 |
 | GET | /api/v1/documents/by-case/:id | 按案件查询文档 |
+| GET | /api/v1/documents/:id/download | 下载案件文件（与文档列表同一成员关系，逐请求校验） |
 | DELETE | /api/v1/documents/:id | 删除文档 |
 | GET | /api/v1/billings | 账单分页列表 |
 | POST | /api/v1/billings | 创建账单 |
@@ -197,6 +198,7 @@ cy-402/
 - 协办律师可维护文档、查看账单，但不能调整成员与案件状态；助理仅能查看案件/客户/文档，账单接口对其整体关闭（路由级 403）。
 - 后端统一判定入口：`service/case_access.go`（`CaseAccessLevel` + `CheckCaseAccess`）+ `repository/case_access.go`（`ScopeCaseMember` 列表过滤）；前端对应 `hooks/usePermission.ts`（`caseRelation` 与 `can*` 系列）。
 - 文件上传同样服从成员范围与维护权限：`POST /upload/file` 必须携带 `case_id`，先通过 `CheckCaseAccess(AccessCoLawyer)` 再写盘，校验失败不产生任何文件；头像走独立的 `POST /upload/avatar`（个人资料，仅需登录）。成员调整后，下一次上传请求立即按新成员关系判定。
+- 文件下载与文档列表同一成员边界：案件文件不再暴露公开静态地址，一律经 `GET /api/v1/documents/:id/download` 按文档记录定位案件并校验成员关系（任意案件成员可读，管理员全局），逐请求判定，成员被移出后旧文件地址立即失效；路径经 `ResolveUploadPath` 防目录穿越。仅 `uploads/avatars/` 头像目录保留公开静态服务（个人资料图片，非案件资料）。
 - 账单归属强约束：创建账单时 `client_id` 必须与案件客户一致（`BillingService.Create` 内 `MatchBillingClient` 校验），不一致按失败处理，不写入账单记录。
 - 历史数据迁移：启动时 `repository/migration.go` 自动把混在 `co_lawyer_ids` 中的助理成员迁到 `assistant_ids`（幂等）。
 

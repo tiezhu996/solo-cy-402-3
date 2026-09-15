@@ -1,6 +1,8 @@
 package util
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +57,30 @@ func TestFormatAmount(t *testing.T) {
 	for _, tc := range cases {
 		if got := FormatAmount(tc.in); got != tc.want {
 			t.Errorf("FormatAmount(%v) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestResolveUploadPath(t *testing.T) {
+	dir := t.TempDir()
+	// 合法 URL：扁平旧路径与子目录新路径都应解析到 uploadDir 内。
+	for _, url := range []string{"/uploads/1.pdf", "/uploads/cases/2.pdf", "/uploads/avatars/3.png"} {
+		p, err := ResolveUploadPath(dir, url)
+		if err != nil {
+			t.Fatalf("ResolveUploadPath(%q) error: %v", url, err)
+		}
+		abs, _ := filepath.Abs(p)
+		if !strings.HasPrefix(abs, dir) {
+			t.Errorf("ResolveUploadPath(%q) = %q escapes upload dir", url, abs)
+		}
+	}
+	// 非法 URL：缺前缀、目录穿越、绝对路径一律拒绝。
+	for _, url := range []string{
+		"", "/etc/passwd", "cases/1.pdf",
+		"/uploads/../secret", "/uploads/../../etc/passwd", "/uploads//etc/passwd",
+	} {
+		if _, err := ResolveUploadPath(dir, url); err == nil {
+			t.Errorf("ResolveUploadPath(%q) should fail", url)
 		}
 	}
 }

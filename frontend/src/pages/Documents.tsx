@@ -3,7 +3,7 @@ import { Card, Form, Input, message, Modal, Select, Space, Table, Button } from 
 import { PlusOutlined } from '@ant-design/icons'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useAuthStore } from '@/stores/authStore'
-import { createDocument, deleteDocument } from '@/api/document'
+import { createDocument, deleteDocument, openDocument } from '@/api/document'
 import { listCases } from '@/api/case'
 import { DocumentTypeOptions } from '@/constants/document'
 import FileUploader from '@/components/common/FileUploader'
@@ -81,7 +81,7 @@ export default function Documents() {
             title: '操作',
             render: (_, row) => (
               <Space>
-                <a href={row.file_url} target="_blank" rel="noreferrer">查看</a>
+                <a onClick={() => openDocument(row.id)}>查看</a>
                 {canMaintain(row.case_id) && (
                   <Button type="link" danger onClick={async () => { await deleteDocument(row.id); message.success('已删除'); store.fetchList({ page, page_size: pageSize, ...filters }) }}>删除</Button>
                 )}

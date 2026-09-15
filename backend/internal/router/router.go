@@ -70,10 +70,13 @@ func (r *Router) Setup() *gin.Engine {
 }
 
 // registerUploadRoutes 文件上传路由。
+// /file 上传案件文件，需案件成员且具备文档维护权限（主办/协办/管理员）；
+// /avatar 上传个人头像，仅需登录。
 func (r *Router) registerUploadRoutes(g *gin.RouterGroup) {
 	upload := g.Group("/upload")
 	upload.Use(middleware.AuthRequired(r.cfg))
 	upload.POST("/file", r.upload.UploadFile)
+	upload.POST("/avatar", r.upload.UploadAvatar)
 }
 
 // registerAuthRoutes 登录注册（限流）。

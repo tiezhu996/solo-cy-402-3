@@ -117,3 +117,21 @@ func TestRemoveID(t *testing.T) {
 		t.Error("removeID should drop the only element")
 	}
 }
+
+func TestMatchBillingClient(t *testing.T) {
+	cases := []struct {
+		caseClientID uint64
+		clientID     uint64
+		want         bool
+	}{
+		{1, 1, true},   // 账单客户 = 案件客户，允许
+		{1, 2, false},  // 账单挂到无关客户，拒绝
+		{0, 1, false},  // 案件无客户归属，拒绝
+		{2, 2, true},
+	}
+	for _, tc := range cases {
+		if got := MatchBillingClient(tc.caseClientID, tc.clientID); got != tc.want {
+			t.Errorf("MatchBillingClient(%d, %d) = %v, want %v", tc.caseClientID, tc.clientID, got, tc.want)
+		}
+	}
+}

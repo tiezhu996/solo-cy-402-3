@@ -26,14 +26,20 @@ func NewBillingService(repo *repository.BillingRepository, caseRepo *repository.
 	return &BillingService{repo: repo, caseRepo: caseRepo, clientRepo: clientRepo, logger: logger}
 }
 
-// Create 创建账单。仅管理员或主办律师。
+// Create 创建账单。仅管理员或主办律师；账单客户必须与案件客户一致，否则按失败处理。
 func (s *BillingService) Create(caseID, clientID uint64, userID uint64, role, billingType string, amount float64, invoiceInfo string) (*model.Billing, error) {
 	if !constants.IsValidBillingType(billingType) {
 		return nil, util.NewAppError(constants.CodeValidationFailed, "Billing[billing_type="+billingType+"] create: invalid type")
 	}
-	if _, _, err := CheckCaseAccess(s.caseRepo, caseID, userID, role, AccessLead); err != nil {
+	cs, _, err := CheckCaseAccess(s.caseRepo, caseID, userID, role, AccessLead)
+	if err != nil {
 		s.logger.Warn(constants.LogCaseAccessDenied, "case_id", caseID, "user_id", userID, "action", "billing_create")
 		return nil, err
+	}
+	if !MatchBillingClient(cs.ClientID, clientID) {
+		s.logger.Warn(constants.LogBillingClientMismatch, "case_id", caseID, "case_client_id", cs.ClientID, "client_id", clientID)
+		return nil, util.NewAppError(constants.CodeValidationFailed,
+			constants.MsgBillingClientMismatch+"（Billing[case_id="+u64(caseID)+",client_id="+u64(clientID)+"] create: case client_id="+u64(cs.ClientID)+"）")
 	}
 	if _, err := s.clientRepo.FindByID(clientID); err != nil {
 		return nil, util.Wrap(err, "Billing[client_id=%d] create: client not found", clientID)
@@ -141,6 +147,11 @@ func (s *BillingService) Summary(memberID uint64) (map[string]float64, error) {
 	}
 	s.logger.Info(constants.LogBillingSummary, "summary", fmt.Sprintf("%v", sum))
 	return sum, nil
+}
+
+// MatchBillingClient 账单客户归属校验：账单只能挂在案件对应客户名下。
+func MatchBillingClient(caseClientID, clientID uint64) bool {
+	return caseClientID == clientID
 }
 
 func genBillNo() string {

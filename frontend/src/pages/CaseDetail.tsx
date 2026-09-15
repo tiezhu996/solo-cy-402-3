@@ -243,7 +243,7 @@ export default function CaseDetail() {
             <Select options={DocumentTypeOptions} />
           </Form.Item>
           <Form.Item label="文件">
-            <FileUploader onUploaded={(u) => setDocUrl(u)} />
+            <FileUploader caseId={caseId} onUploaded={(u) => setDocUrl(u)} />
           </Form.Item>
         </Form>
       </Modal>

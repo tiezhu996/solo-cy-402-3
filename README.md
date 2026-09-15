@@ -165,7 +165,8 @@ cy-402/
 | POST | /api/v1/billings/:id/invoiced | 标记开票 |
 | POST | /api/v1/billings/:id/void | 作废账单 |
 | GET | /api/v1/audit-logs | 审计日志（仅管理员） |
-| POST | /api/v1/upload/file | 文件上传 |
+| POST | /api/v1/upload/file | 上传案件文件（需 case_id，且具备该案件文档维护权限） |
+| POST | /api/v1/upload/avatar | 上传个人头像（登录即可） |
 
 ## 主要功能
 
@@ -195,6 +196,8 @@ cy-402/
 - 成员调整（`PUT /cases/:id/members`）与主办交接（`POST /cases/:id/assign`）即时生效：权限判定逐请求读取数据库，被移除者下一请求即失去访问，新增成员立即获得对应权限；交接后管理权随 `lead_lawyer_id` 一并转移。
 - 协办律师可维护文档、查看账单，但不能调整成员与案件状态；助理仅能查看案件/客户/文档，账单接口对其整体关闭（路由级 403）。
 - 后端统一判定入口：`service/case_access.go`（`CaseAccessLevel` + `CheckCaseAccess`）+ `repository/case_access.go`（`ScopeCaseMember` 列表过滤）；前端对应 `hooks/usePermission.ts`（`caseRelation` 与 `can*` 系列）。
+- 文件上传同样服从成员范围与维护权限：`POST /upload/file` 必须携带 `case_id`，先通过 `CheckCaseAccess(AccessCoLawyer)` 再写盘，校验失败不产生任何文件；头像走独立的 `POST /upload/avatar`（个人资料，仅需登录）。成员调整后，下一次上传请求立即按新成员关系判定。
+- 账单归属强约束：创建账单时 `client_id` 必须与案件客户一致（`BillingService.Create` 内 `MatchBillingClient` 校验），不一致按失败处理，不写入账单记录。
 - 历史数据迁移：启动时 `repository/migration.go` 自动把混在 `co_lawyer_ids` 中的助理成员迁到 `assistant_ids`（幂等）。
 
 ## License

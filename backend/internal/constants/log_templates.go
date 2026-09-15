@@ -33,6 +33,8 @@ const (
 	LogAuditWriteFailed        = "audit log write failed"
 	LogUploadFileSuccess       = "upload file success"
 	LogUploadFileFailed        = "upload file failed"
+	LogUploadAccessDenied      = "upload access denied"
+	LogBillingClientMismatch   = "billing client mismatch"
 	LogRateLimitHit            = "rate limit hit"
 	LogCommentCreateFailed     = "unused comment template"
 )

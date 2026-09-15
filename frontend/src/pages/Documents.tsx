@@ -21,6 +21,7 @@ export default function Documents() {
   const [url, setUrl] = useState('')
   const [cases, setCases] = useState<CaseItem[]>([])
   const [form] = Form.useForm()
+  const selectedCaseId = Form.useWatch('case_id', form)
 
   useEffect(() => {
     store.fetchList({ page, page_size: pageSize, ...filters })
@@ -96,12 +97,13 @@ export default function Documents() {
               showSearch
               optionFilterProp="label"
               options={maintainableCases.map((c) => ({ label: `${c.case_no} ${c.title}`, value: c.id }))}
+              onChange={() => setUrl('')}
             />
           </Form.Item>
           <Form.Item name="title" label="文档标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="file_type" label="文件类型" rules={[{ required: true }]}><Select options={DocumentTypeOptions} /></Form.Item>
           <Form.Item label="文件">
-            <FileUploader onUploaded={(u) => setUrl(u)} />
+            <FileUploader caseId={selectedCaseId} onUploaded={(u) => setUrl(u)} />
           </Form.Item>
         </Form>
       </Modal>

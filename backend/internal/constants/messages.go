@@ -20,6 +20,7 @@ const (
 	MsgCaseCreated           = "案件创建成功"
 	MsgCaseMembersUpdated    = "案件成员已更新"
 	MsgCaseAccessDenied      = "您不是该案件成员或权限不足，无权访问"
+	MsgBillingClientMismatch = "账单客户与案件客户不一致"
 	MsgDocumentUploaded      = "文档上传成功"
 	MsgBillingCreated        = "账单创建成功"
 	MsgBillingPaid           = "账单已标记支付"

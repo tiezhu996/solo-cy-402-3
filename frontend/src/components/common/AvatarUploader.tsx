@@ -2,13 +2,15 @@ import { Upload } from 'antd'
 import { useFileUpload } from '@/hooks/useFileUpload'
 
 export default function AvatarUploader({ onUploaded }: { onUploaded: (url: string) => void }) {
-  const { uploading, upload } = useFileUpload()
+  const { uploading, uploadAvatarFile } = useFileUpload()
   return (
     <Upload
       showUploadList={false}
       accept="image/*"
       beforeUpload={(file) => {
-        upload(file).then((url) => onUploaded(url))
+        uploadAvatarFile(file).then((url) => {
+          if (url) onUploaded(url)
+        })
         return false
       }}
     >

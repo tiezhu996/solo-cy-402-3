@@ -63,7 +63,7 @@ func main() {
 	caseHandler := handler.NewCaseHandler(caseSvc, logger)
 	documentHandler := handler.NewDocumentHandler(documentSvc, logger)
 	billingHandler := handler.NewBillingHandler(billingSvc, logger)
-	uploadHandler := handler.NewUploadHandler(cfg, logger)
+	uploadHandler := handler.NewUploadHandler(cfg, caseRepo, logger)
 	auditLogHandler := handler.NewAuditLogHandler(db, logger)
 
 	r := router.New(cfg, db, logger, userHandler, clientHandler, caseHandler,

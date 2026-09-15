@@ -37,6 +37,10 @@ func main() {
 		logger.Error("auto migrate failed", "error", err.Error())
 		os.Exit(1)
 	}
+	if err := repository.MigrateCaseMemberSplit(db); err != nil {
+		logger.Error("case member migration failed", "error", err.Error())
+		os.Exit(1)
+	}
 	if err := service.NewSeedService(db, logger).Seed(); err != nil {
 		logger.Error("seed failed", "error", err.Error())
 		os.Exit(1)

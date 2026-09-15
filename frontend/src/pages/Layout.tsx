@@ -3,12 +3,13 @@ import { UserOutlined } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 
+// 菜单项与所需角色：费用中心对助理隐藏（其不可见账单），审计日志仅管理员。
 const items = [
   { key: '/cases', label: '案件列表' },
   { key: '/clients', label: '客户管理' },
-  { key: '/billing', label: '费用中心' },
+  { key: '/billing', label: '费用中心', roles: ['admin', 'lawyer'] },
   { key: '/documents', label: '文档中心' },
-  { key: '/audit-logs', label: '审计日志' },
+  { key: '/audit-logs', label: '审计日志', roles: ['admin'] },
   { key: '/profile', label: '个人中心' },
 ]
 
@@ -17,6 +18,10 @@ export default function Layout() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+  const role = user?.role || ''
+  const menuItems = items
+    .filter((it) => !it.roles || it.roles.includes(role))
+    .map(({ key, label }) => ({ key, label }))
   const selected = items.find((it) => location.pathname.startsWith(it.key))?.key || '/cases'
 
   return (
@@ -29,7 +34,7 @@ export default function Layout() {
           theme="dark"
           mode="horizontal"
           selectedKeys={[selected]}
-          items={items}
+          items={menuItems}
           style={{ flex: 1, minWidth: 0 }}
           onClick={({ key }) => navigate(key)}
         />

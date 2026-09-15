@@ -13,6 +13,10 @@ export function listLawyers() {
   return request.get('/users/lawyers')
 }
 
+export function listAssistants() {
+  return request.get('/users/assistants')
+}
+
 export function listUsers(params: { page?: number; page_size?: number }) {
   return request.get('/users', { params })
 }

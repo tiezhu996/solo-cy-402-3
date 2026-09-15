@@ -21,6 +21,14 @@ export function changeCaseStatus(id: number, status: string) {
   return request.post(`/cases/${id}/status`, { status })
 }
 
-export function assignLawyer(id: number, data: { lead_lawyer_id: number; co_lawyer_ids?: number[] }) {
+export function assignLawyer(id: number, data: { lead_lawyer_id: number }) {
   return request.post(`/cases/${id}/assign`, data)
+}
+
+export function getCaseMembers(id: number) {
+  return request.get(`/cases/${id}/members`)
+}
+
+export function updateCaseMembers(id: number, data: { co_lawyer_ids: number[]; assistant_ids: number[] }) {
+  return request.put(`/cases/${id}/members`, data)
 }

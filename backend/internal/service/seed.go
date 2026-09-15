@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -38,13 +37,12 @@ func (s *SeedService) Seed() error {
 		{Username: "admin", PasswordHash: string(adminHash), RealName: "系统管理员", Role: constants.RoleAdmin, Email: "admin@cylawcase.dev", Phone: "13800000001"},
 		{Username: "lawyer", PasswordHash: string(userHash), RealName: "张律师", Role: constants.RoleLawyer, LicenseNo: "LAW1101010001", Email: "lawyer@cylawcase.dev", Phone: "13800000002"},
 		{Username: "assistant", PasswordHash: string(userHash), RealName: "李助理", Role: constants.RoleAssistant, Email: "assistant@cylawcase.dev", Phone: "13800000003"},
+		{Username: "lawyer2", PasswordHash: string(userHash), RealName: "王律师", Role: constants.RoleLawyer, LicenseNo: "LAW1101010002", Email: "lawyer2@cylawcase.dev", Phone: "13800000004"},
 	}
 	now := time.Now()
-	raw, _ := json.Marshal([]uint64{3})
-	co := model.CoLawyerJSON(raw)
 	cases := []model.Case{
-		{CaseNo: "CY20260001", Title: "华信科技买卖合同纠纷", CaseType: constants.CaseTypeCommercial, Status: constants.CaseStatusInvestigating, ClientID: 1, LeadLawyerID: 2, CoLawyerIDs: co, Summary: "货款催收与合同违约赔偿。"},
-		{CaseNo: "CY20260002", Title: "陈晓明民间借贷纠纷", CaseType: constants.CaseTypeCivil, Status: constants.CaseStatusFiled, ClientID: 2, LeadLawyerID: 2, Summary: "借款 50 万元及利息追偿。"},
+		{CaseNo: "CY20260001", Title: "华信科技买卖合同纠纷", CaseType: constants.CaseTypeCommercial, Status: constants.CaseStatusInvestigating, ClientID: 1, LeadLawyerID: 2, CoLawyerIDs: model.IDList{4}, AssistantIDs: model.IDList{3}, Summary: "货款催收与合同违约赔偿。"},
+		{CaseNo: "CY20260002", Title: "陈晓明民间借贷纠纷", CaseType: constants.CaseTypeCivil, Status: constants.CaseStatusFiled, ClientID: 2, LeadLawyerID: 2, CoLawyerIDs: model.IDList{}, AssistantIDs: model.IDList{}, Summary: "借款 50 万元及利息追偿。"},
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		for i := range users {

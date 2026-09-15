@@ -26,14 +26,14 @@ func NewDocumentHandler(svc *service.DocumentService, logger *slog.Logger) *Docu
 	return &DocumentHandler{svc: svc, logger: logger}
 }
 
-// Create 上传文档。
+// Create 上传文档。仅管理员/主办/协办律师。
 func (h *DocumentHandler) Create(c *gin.Context) {
 	var req dto.DocumentCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Document create: "+err.Error())
 		return
 	}
-	d, err := h.svc.Create(req.CaseID, middleware.GetUserID(c), req.Title, req.FileType, req.FileURL)
+	d, err := h.svc.Create(req.CaseID, middleware.GetUserID(c), middleware.GetUserRole(c), req.Title, req.FileType, req.FileURL)
 	if err != nil {
 		h.wrapError(c, err, "Document[case_id="+strconv.FormatUint(req.CaseID, 10)+"] create failed")
 		return
@@ -41,14 +41,14 @@ func (h *DocumentHandler) Create(c *gin.Context) {
 	OKWithMessage(c, constants.MsgDocumentUploaded, d)
 }
 
-// ListByCase 按案件查看文档。
+// ListByCase 按案件查看文档。案件成员可见。
 func (h *DocumentHandler) ListByCase(c *gin.Context) {
 	caseID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Document list: invalid case id")
 		return
 	}
-	list, err := h.svc.ListByCase(caseID)
+	list, err := h.svc.ListByCase(caseID, middleware.GetUserID(c), middleware.GetUserRole(c))
 	if err != nil {
 		h.wrapError(c, err, "Document list by case failed")
 		return
@@ -56,12 +56,12 @@ func (h *DocumentHandler) ListByCase(c *gin.Context) {
 	OK(c, list)
 }
 
-// List 文档中心分页查询。
+// List 文档中心分页查询。非管理员仅返回其为成员的案件文档。
 func (h *DocumentHandler) List(c *gin.Context) {
 	var q dto.PageQuery
 	_ = c.ShouldBindQuery(&q)
 	q.Normalize()
-	list, total, err := h.svc.List(q.Page, q.PageSize, c.Query("file_type"), c.Query("keyword"))
+	list, total, err := h.svc.List(q.Page, q.PageSize, c.Query("file_type"), c.Query("keyword"), memberScope(c))
 	if err != nil {
 		h.wrapError(c, err, "Document list failed")
 		return
@@ -69,14 +69,14 @@ func (h *DocumentHandler) List(c *gin.Context) {
 	OK(c, pageResponse(list, total, q.Page, q.PageSize))
 }
 
-// Delete 删除文档。
+// Delete 删除文档。仅管理员/主办/协办律师。
 func (h *DocumentHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Document[id] delete: invalid id")
 		return
 	}
-	if err := h.svc.Delete(id); err != nil {
+	if err := h.svc.Delete(id, middleware.GetUserID(c), middleware.GetUserRole(c)); err != nil {
 		h.wrapError(c, err, "Document delete failed")
 		return
 	}

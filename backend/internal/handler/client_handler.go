@@ -8,6 +8,7 @@ import (
 
 	"cylawcase/internal/constants"
 	"cylawcase/internal/dto"
+	"cylawcase/internal/middleware"
 	"cylawcase/internal/service"
 	"cylawcase/internal/util"
 
@@ -25,12 +26,12 @@ func NewClientHandler(svc *service.ClientService, logger *slog.Logger) *ClientHa
 	return &ClientHandler{svc: svc, logger: logger}
 }
 
-// List 客户列表。
+// List 客户列表。非管理员仅返回其为成员的案件所属客户。
 func (h *ClientHandler) List(c *gin.Context) {
 	var q dto.PageQuery
 	_ = c.ShouldBindQuery(&q)
 	q.Normalize()
-	list, total, err := h.svc.List(q.Page, q.PageSize, c.Query("keyword"))
+	list, total, err := h.svc.List(q.Page, q.PageSize, c.Query("keyword"), memberScope(c))
 	if err != nil {
 		h.wrapError(c, err, "Client list failed")
 		return
@@ -38,14 +39,14 @@ func (h *ClientHandler) List(c *gin.Context) {
 	OK(c, pageResponse(list, total, q.Page, q.PageSize))
 }
 
-// Get 客户详情 + 历史案件。
+// Get 客户详情 + 历史案件。非管理员需为该客户案件的成员。
 func (h *ClientHandler) Get(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Client[id] get: invalid id")
 		return
 	}
-	client, cases, err := h.svc.GetWithCases(id)
+	client, cases, err := h.svc.GetWithCases(id, middleware.GetUserID(c), middleware.GetUserRole(c))
 	if err != nil {
 		h.wrapError(c, err, "Client get failed")
 		return
@@ -68,7 +69,7 @@ func (h *ClientHandler) Create(c *gin.Context) {
 	OKWithMessage(c, constants.MsgClientCreated, cl)
 }
 
-// Update 编辑客户。
+// Update 编辑客户。管理员全局；律师需为该客户案件的成员。
 func (h *ClientHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -80,7 +81,8 @@ func (h *ClientHandler) Update(c *gin.Context) {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Client[id="+strconv.FormatUint(id, 10)+"] update: "+err.Error())
 		return
 	}
-	cl, err := h.svc.Update(id, req.Name, req.IDNumber, req.Contact, req.Address, req.Remark)
+	cl, err := h.svc.Update(id, middleware.GetUserID(c), middleware.GetUserRole(c),
+		req.Name, req.IDNumber, req.Contact, req.Address, req.Remark)
 	if err != nil {
 		h.wrapError(c, err, "Client update failed")
 		return
@@ -88,14 +90,14 @@ func (h *ClientHandler) Update(c *gin.Context) {
 	OK(c, cl)
 }
 
-// Delete 删除客户。
+// Delete 删除客户。权限同 Update。
 func (h *ClientHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Client[id] delete: invalid id")
 		return
 	}
-	if err := h.svc.Delete(id); err != nil {
+	if err := h.svc.Delete(id, middleware.GetUserID(c), middleware.GetUserRole(c)); err != nil {
 		h.wrapError(c, err, "Client delete failed")
 		return
 	}

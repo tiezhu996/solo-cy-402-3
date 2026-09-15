@@ -8,6 +8,7 @@ import (
 
 	"cylawcase/internal/constants"
 	"cylawcase/internal/dto"
+	"cylawcase/internal/middleware"
 	"cylawcase/internal/service"
 	"cylawcase/internal/util"
 
@@ -25,14 +26,14 @@ func NewBillingHandler(svc *service.BillingService, logger *slog.Logger) *Billin
 	return &BillingHandler{svc: svc, logger: logger}
 }
 
-// List 账单列表。
+// List 账单列表。非管理员仅返回其为成员的案件账单。
 func (h *BillingHandler) List(c *gin.Context) {
 	var q dto.PageQuery
 	_ = c.ShouldBindQuery(&q)
 	q.Normalize()
 	caseID, _ := strconv.ParseUint(c.Query("case_id"), 10, 64)
 	clientID, _ := strconv.ParseUint(c.Query("client_id"), 10, 64)
-	list, total, err := h.svc.List(q.Page, q.PageSize, caseID, clientID, c.Query("status"))
+	list, total, err := h.svc.List(q.Page, q.PageSize, caseID, clientID, c.Query("status"), memberScope(c))
 	if err != nil {
 		h.wrapError(c, err, "Billing list failed")
 		return
@@ -40,14 +41,14 @@ func (h *BillingHandler) List(c *gin.Context) {
 	OK(c, pageResponse(list, total, q.Page, q.PageSize))
 }
 
-// ListByCase 某案件账单。
+// ListByCase 某案件账单。主办/协办律师可查看。
 func (h *BillingHandler) ListByCase(c *gin.Context) {
 	caseID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Billing list by case: invalid case id")
 		return
 	}
-	list, err := h.svc.ListByCase(caseID)
+	list, err := h.svc.ListByCase(caseID, middleware.GetUserID(c), middleware.GetUserRole(c))
 	if err != nil {
 		h.wrapError(c, err, "Billing list by case failed")
 		return
@@ -55,14 +56,15 @@ func (h *BillingHandler) ListByCase(c *gin.Context) {
 	OK(c, list)
 }
 
-// Create 创建账单。
+// Create 创建账单。仅管理员或主办律师。
 func (h *BillingHandler) Create(c *gin.Context) {
 	var req dto.BillingCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Billing create: "+err.Error())
 		return
 	}
-	b, err := h.svc.Create(req.CaseID, req.ClientID, req.BillingType, req.Amount, req.InvoiceInfo)
+	b, err := h.svc.Create(req.CaseID, req.ClientID, middleware.GetUserID(c), middleware.GetUserRole(c),
+		req.BillingType, req.Amount, req.InvoiceInfo)
 	if err != nil {
 		h.wrapError(c, err, "Billing[case_id="+strconv.FormatUint(req.CaseID, 10)+"] create failed")
 		return
@@ -70,14 +72,14 @@ func (h *BillingHandler) Create(c *gin.Context) {
 	OKWithMessage(c, constants.MsgBillingCreated, b)
 }
 
-// MarkPaid 标记支付。
+// MarkPaid 标记支付。仅管理员或主办律师。
 func (h *BillingHandler) MarkPaid(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Billing[id] paid: invalid id")
 		return
 	}
-	b, err := h.svc.MarkPaid(id)
+	b, err := h.svc.MarkPaid(id, middleware.GetUserID(c), middleware.GetUserRole(c))
 	if err != nil {
 		h.wrapError(c, err, "Billing paid failed")
 		return
@@ -85,7 +87,7 @@ func (h *BillingHandler) MarkPaid(c *gin.Context) {
 	OKWithMessage(c, constants.MsgBillingPaid, b)
 }
 
-// MarkInvoiced 开票。
+// MarkInvoiced 开票。仅管理员或主办律师。
 func (h *BillingHandler) MarkInvoiced(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -94,7 +96,7 @@ func (h *BillingHandler) MarkInvoiced(c *gin.Context) {
 	}
 	var req dto.BillingInvoiceRequest
 	_ = c.ShouldBindJSON(&req)
-	b, err := h.svc.MarkInvoiced(id, req.InvoiceInfo)
+	b, err := h.svc.MarkInvoiced(id, middleware.GetUserID(c), middleware.GetUserRole(c), req.InvoiceInfo)
 	if err != nil {
 		h.wrapError(c, err, "Billing invoiced failed")
 		return
@@ -102,14 +104,14 @@ func (h *BillingHandler) MarkInvoiced(c *gin.Context) {
 	OKWithMessage(c, constants.MsgBillingInvoiced, b)
 }
 
-// Void 作废账单。
+// Void 作废账单。仅管理员或主办律师。
 func (h *BillingHandler) Void(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		Fail(c, http.StatusBadRequest, constants.CodeBadRequest, "Billing[id] void: invalid id")
 		return
 	}
-	b, err := h.svc.Void(id)
+	b, err := h.svc.Void(id, middleware.GetUserID(c), middleware.GetUserRole(c))
 	if err != nil {
 		h.wrapError(c, err, "Billing void failed")
 		return
@@ -117,9 +119,9 @@ func (h *BillingHandler) Void(c *gin.Context) {
 	OKWithMessage(c, constants.MsgBillingVoided, b)
 }
 
-// Summary 本月汇总。
+// Summary 本月汇总。非管理员仅统计其为成员的案件账单。
 func (h *BillingHandler) Summary(c *gin.Context) {
-	sum, err := h.svc.Summary()
+	sum, err := h.svc.Summary(memberScope(c))
 	if err != nil {
 		h.wrapError(c, err, "Billing summary failed")
 		return

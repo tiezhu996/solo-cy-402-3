@@ -51,11 +51,32 @@ func (r *UserRepository) FindByUsername(username string) (*model.User, error) {
 	return &u, nil
 }
 
+// FindByIDs 批量按 ID 查询用户（用于案件成员视图）。
+func (r *UserRepository) FindByIDs(ids []uint64) ([]model.User, error) {
+	list := []model.User{}
+	if len(ids) == 0 {
+		return list, nil
+	}
+	if err := r.db.Where("id IN ?", ids).Order("id ASC").Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("find users by ids: %w", err)
+	}
+	return list, nil
+}
+
 // ListLawyers 查询律师列表。
 func (r *UserRepository) ListLawyers() ([]model.User, error) {
 	var list []model.User
 	if err := r.db.Where("role = ?", "lawyer").Order("id ASC").Find(&list).Error; err != nil {
 		return nil, fmt.Errorf("list lawyers: %w", err)
+	}
+	return list, nil
+}
+
+// ListByRole 按角色查询用户列表（用于案件成员候选：协办律师/助理）。
+func (r *UserRepository) ListByRole(role string) ([]model.User, error) {
+	var list []model.User
+	if err := r.db.Where("role = ?", role).Order("id ASC").Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("list users by role: %w", err)
 	}
 	return list, nil
 }

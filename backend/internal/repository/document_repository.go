@@ -48,11 +48,15 @@ func (r *DocumentRepository) ListByCase(caseID uint64) ([]model.Document, error)
 	return list, nil
 }
 
-// List 分页查询文档，支持类型/关键词筛选。
-func (r *DocumentRepository) List(page, pageSize int, fileType, keyword string) ([]model.Document, int64, error) {
+// List 分页查询文档，支持类型/关键词筛选；memberID > 0 时仅返回该用户为成员的案件文档。
+func (r *DocumentRepository) List(page, pageSize int, fileType, keyword string, memberID uint64) ([]model.Document, int64, error) {
 	var list []model.Document
 	var total int64
 	q := r.db.Model(&model.Document{})
+	if memberID > 0 {
+		sub := r.db.Model(&model.Case{}).Select("id").Scopes(ScopeCaseMember(memberID))
+		q = q.Where("case_id IN (?)", sub)
+	}
 	if fileType != "" {
 		q = q.Where("file_type = ?", fileType)
 	}

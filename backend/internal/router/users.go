@@ -14,5 +14,6 @@ func (r *Router) registerUserRoutes(g *gin.RouterGroup) {
 	users.GET("/me", r.user.Me)
 	users.PUT("/me", r.user.UpdateProfile)
 	users.GET("/lawyers", r.user.ListLawyers)
+	users.GET("/assistants", r.user.ListAssistants)
 	users.GET("", middleware.RequireRole(constants.RoleAdmin), r.user.List)
 }

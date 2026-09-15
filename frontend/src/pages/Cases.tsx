@@ -3,6 +3,7 @@ import { Button, Modal, Form, Input, Select, DatePicker, message, Card, Table } 
 import { PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import FilterBar from '@/components/common/FilterBar'
+import PermissionGuard from '@/components/common/PermissionGuard'
 import { useCaseStore } from '@/stores/caseStore'
 import { useUserStore } from '@/stores/userStore'
 import { useClientStore } from '@/stores/clientStore'
@@ -21,9 +22,11 @@ export default function Cases() {
   const [filters, setFilters] = useState<Record<string, unknown>>({})
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
+  const leadLawyerId = Form.useWatch('lead_lawyer_id', form)
 
   useEffect(() => {
     userStore.fetchLawyers()
+    userStore.fetchAssistants()
     clientStore.fetchList({ page: 1, page_size: 200 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -40,6 +43,8 @@ export default function Cases() {
       case_type: values.case_type,
       client_id: values.client_id,
       lead_lawyer_id: values.lead_lawyer_id,
+      co_lawyer_ids: values.co_lawyer_ids,
+      assistant_ids: values.assistant_ids,
       accept_date: values.accept_date ? values.accept_date.format('YYYY-MM-DD') : undefined,
       summary: values.summary,
     })
@@ -57,9 +62,11 @@ export default function Cases() {
         lawyerOptions={userStore.lawyers.map((l) => ({ label: l.real_name || l.username, value: l.id }))}
         onSearch={(v) => { setFilters(v); setPage(1) }}
       />
-      <Button type="primary" icon={<PlusOutlined />} style={{ marginBottom: 16 }} onClick={() => setOpen(true)}>
-        创建案件
-      </Button>
+      <PermissionGuard roles={['admin', 'lawyer']}>
+        <Button type="primary" icon={<PlusOutlined />} style={{ marginBottom: 16 }} onClick={() => setOpen(true)}>
+          创建案件
+        </Button>
+      </PermissionGuard>
       <Table<CaseItem>
         rowKey="id"
         dataSource={store.list}
@@ -87,6 +94,12 @@ export default function Cases() {
           </Form.Item>
           <Form.Item name="lead_lawyer_id" label="主办律师" rules={[{ required: true }]}>
             <Select options={userStore.lawyers.map((l) => ({ label: l.real_name || l.username, value: l.id }))} />
+          </Form.Item>
+          <Form.Item name="co_lawyer_ids" label="协办律师">
+            <Select mode="multiple" allowClear options={userStore.lawyers.filter((l) => l.id !== leadLawyerId).map((l) => ({ label: l.real_name || l.username, value: l.id }))} />
+          </Form.Item>
+          <Form.Item name="assistant_ids" label="助理">
+            <Select mode="multiple" allowClear options={userStore.assistants.map((a) => ({ label: a.real_name || a.username, value: a.id }))} />
           </Form.Item>
           <Form.Item name="accept_date" label="受理日期">
             <DatePicker style={{ width: '100%' }} />

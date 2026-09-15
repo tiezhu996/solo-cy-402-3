@@ -33,7 +33,7 @@ func appErrorStatus(code int) int {
 	switch code {
 	case constants.CodeUnauthorized, constants.CodeInvalidCredentials:
 		return http.StatusUnauthorized
-	case constants.CodeForbidden:
+	case constants.CodeForbidden, constants.CodeCaseAccessDenied:
 		return http.StatusForbidden
 	case constants.CodeNotFound:
 		return http.StatusNotFound

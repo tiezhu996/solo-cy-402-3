@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cylawcase/internal/constants"
+	"cylawcase/internal/model"
 )
 
 func TestCanFlow(t *testing.T) {
@@ -53,5 +54,66 @@ func TestStatusValidators(t *testing.T) {
 	}
 	if !constants.IsValidBillingType(constants.BillingTypeTravelFee) {
 		t.Error("travel_fee should be valid")
+	}
+}
+
+func TestResolveCaseAccess(t *testing.T) {
+	c := &model.Case{ID: 1, LeadLawyerID: 10, CoLawyerIDs: model.IDList{20, 21}, AssistantIDs: model.IDList{30}}
+	cases := []struct {
+		name   string
+		kase   *model.Case
+		userID uint64
+		role   string
+		want   CaseAccessLevel
+	}{
+		{"admin global", c, 999, constants.RoleAdmin, AccessAdmin},
+		{"lead lawyer", c, 10, constants.RoleLawyer, AccessLead},
+		{"co lawyer", c, 20, constants.RoleLawyer, AccessCoLawyer},
+		{"assistant member", c, 30, constants.RoleAssistant, AccessAssistant},
+		{"non member lawyer", c, 40, constants.RoleLawyer, AccessNone},
+		{"non member assistant", c, 41, constants.RoleAssistant, AccessNone},
+		{"nil case", nil, 10, constants.RoleLawyer, AccessNone},
+		{"admin nil case", nil, 10, constants.RoleAdmin, AccessAdmin},
+	}
+	for _, tc := range cases {
+		if got := ResolveCaseAccess(tc.kase, tc.userID, tc.role); got != tc.want {
+			t.Errorf("%s: ResolveCaseAccess = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestCaseAccessLevelOrdering(t *testing.T) {
+	// 级别数值即权限高低：assistant < co_lawyer < lead < admin，越权判定依赖该顺序。
+	if !(AccessNone < AccessAssistant && AccessAssistant < AccessCoLawyer && AccessCoLawyer < AccessLead && AccessLead < AccessAdmin) {
+		t.Error("access level ordering broken")
+	}
+	if AccessAdmin.String() != "admin" || AccessCoLawyer.String() != "co_lawyer" || AccessNone.String() != "none" {
+		t.Error("access level string broken")
+	}
+}
+
+func TestNormalizeIDList(t *testing.T) {
+	got := normalizeIDList([]uint64{3, 0, 3, 5, 5, 7})
+	want := model.IDList{3, 5, 7}
+	if len(got) != len(want) {
+		t.Fatalf("normalizeIDList = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("normalizeIDList[%d] = %d, want %d", i, got[i], want[i])
+		}
+	}
+	if empty := normalizeIDList(nil); len(empty) != 0 {
+		t.Errorf("normalizeIDList(nil) = %v, want empty", empty)
+	}
+}
+
+func TestRemoveID(t *testing.T) {
+	got := removeID(model.IDList{4, 5, 6}, 5)
+	if len(got) != 2 || got[0] != 4 || got[1] != 6 {
+		t.Errorf("removeID = %v, want [4 6]", got)
+	}
+	if idListContains(removeID(model.IDList{4}, 4), 4) {
+		t.Error("removeID should drop the only element")
 	}
 }

@@ -24,7 +24,14 @@ const router = createBrowserRouter([
       { path: 'cases', element: <Cases /> },
       { path: 'cases/:id', element: <CaseDetail /> },
       { path: 'clients', element: <Clients /> },
-      { path: 'billing', element: <Billing /> },
+      {
+        path: 'billing',
+        element: (
+          <RequireRole roles={['admin', 'lawyer']}>
+            <Billing />
+          </RequireRole>
+        ),
+      },
       { path: 'documents', element: <Documents /> },
       { path: 'profile', element: <Profile /> },
       {

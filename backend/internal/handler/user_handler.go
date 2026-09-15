@@ -91,6 +91,16 @@ func (h *UserHandler) ListLawyers(c *gin.Context) {
 	OK(c, list)
 }
 
+// ListAssistants 助理列表（用于案件成员管理）。
+func (h *UserHandler) ListAssistants(c *gin.Context) {
+	list, err := h.svc.ListAssistants()
+	if err != nil {
+		h.wrapError(c, err, "User list assistants failed")
+		return
+	}
+	OK(c, list)
+}
+
 // List 用户列表（管理员）。
 func (h *UserHandler) List(c *gin.Context) {
 	var q dto.PageQuery

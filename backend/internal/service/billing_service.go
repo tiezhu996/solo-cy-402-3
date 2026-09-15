@@ -26,13 +26,14 @@ func NewBillingService(repo *repository.BillingRepository, caseRepo *repository.
 	return &BillingService{repo: repo, caseRepo: caseRepo, clientRepo: clientRepo, logger: logger}
 }
 
-// Create 创建账单。
-func (s *BillingService) Create(caseID, clientID uint64, billingType string, amount float64, invoiceInfo string) (*model.Billing, error) {
+// Create 创建账单。仅管理员或主办律师。
+func (s *BillingService) Create(caseID, clientID uint64, userID uint64, role, billingType string, amount float64, invoiceInfo string) (*model.Billing, error) {
 	if !constants.IsValidBillingType(billingType) {
 		return nil, util.NewAppError(constants.CodeValidationFailed, "Billing[billing_type="+billingType+"] create: invalid type")
 	}
-	if _, err := s.caseRepo.FindByID(caseID); err != nil {
-		return nil, util.Wrap(err, "Billing[case_id=%d] create: case not found", caseID)
+	if _, _, err := CheckCaseAccess(s.caseRepo, caseID, userID, role, AccessLead); err != nil {
+		s.logger.Warn(constants.LogCaseAccessDenied, "case_id", caseID, "user_id", userID, "action", "billing_create")
+		return nil, err
 	}
 	if _, err := s.clientRepo.FindByID(clientID); err != nil {
 		return nil, util.Wrap(err, "Billing[client_id=%d] create: client not found", clientID)
@@ -51,11 +52,11 @@ func (s *BillingService) Create(caseID, clientID uint64, billingType string, amo
 	return b, nil
 }
 
-// MarkPaid 标记支付（pending -> paid）。
-func (s *BillingService) MarkPaid(id uint64) (*model.Billing, error) {
-	b, err := s.repo.FindByID(id)
+// MarkPaid 标记支付（pending -> paid）。仅管理员或主办律师。
+func (s *BillingService) MarkPaid(id, userID uint64, role string) (*model.Billing, error) {
+	b, err := s.writableBilling(id, userID, role, "paid")
 	if err != nil {
-		return nil, util.Wrap(err, "Billing[id=%d] paid find failed", id)
+		return nil, err
 	}
 	if b.Status != constants.BillingStatusPending {
 		s.logger.Warn(constants.LogBillingPaidFailed, "billing_id", id, "status", b.Status)
@@ -69,11 +70,11 @@ func (s *BillingService) MarkPaid(id uint64) (*model.Billing, error) {
 	return b, nil
 }
 
-// MarkInvoiced 开票（paid -> invoiced）。
-func (s *BillingService) MarkInvoiced(id uint64, invoiceInfo string) (*model.Billing, error) {
-	b, err := s.repo.FindByID(id)
+// MarkInvoiced 开票（paid -> invoiced）。仅管理员或主办律师。
+func (s *BillingService) MarkInvoiced(id, userID uint64, role, invoiceInfo string) (*model.Billing, error) {
+	b, err := s.writableBilling(id, userID, role, "invoiced")
 	if err != nil {
-		return nil, util.Wrap(err, "Billing[id=%d] invoiced find failed", id)
+		return nil, err
 	}
 	if b.Status != constants.BillingStatusPaid {
 		return nil, util.NewAppError(constants.CodeBillingStatusConflict, "Billing[id="+u64(id)+"] invoiced failed: status="+b.Status)
@@ -89,11 +90,11 @@ func (s *BillingService) MarkInvoiced(id uint64, invoiceInfo string) (*model.Bil
 	return b, nil
 }
 
-// Void 作废账单。
-func (s *BillingService) Void(id uint64) (*model.Billing, error) {
-	b, err := s.repo.FindByID(id)
+// Void 作废账单。仅管理员或主办律师。
+func (s *BillingService) Void(id, userID uint64, role string) (*model.Billing, error) {
+	b, err := s.writableBilling(id, userID, role, "void")
 	if err != nil {
-		return nil, util.Wrap(err, "Billing[id=%d] void find failed", id)
+		return nil, err
 	}
 	if b.Status == constants.BillingStatusVoid {
 		return nil, util.NewAppError(constants.CodeBillingStatusConflict, "Billing[id="+u64(id)+"] void failed: already void")
@@ -106,19 +107,35 @@ func (s *BillingService) Void(id uint64) (*model.Billing, error) {
 	return b, nil
 }
 
-// List 分页查询账单。
-func (s *BillingService) List(page, pageSize int, caseID, clientID uint64, status string) ([]model.Billing, int64, error) {
-	return s.repo.List(page, pageSize, caseID, clientID, status)
+// writableBilling 加载账单并校验操作者对其案件具备主办级权限。
+func (s *BillingService) writableBilling(id, userID uint64, role, action string) (*model.Billing, error) {
+	b, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, util.Wrap(err, "Billing[id=%d] %s find failed", id, action)
+	}
+	if _, _, err := CheckCaseAccess(s.caseRepo, b.CaseID, userID, role, AccessLead); err != nil {
+		s.logger.Warn(constants.LogCaseAccessDenied, "case_id", b.CaseID, "user_id", userID, "action", "billing_"+action)
+		return nil, err
+	}
+	return b, nil
 }
 
-// ListByCase 查询某案件账单。
-func (s *BillingService) ListByCase(caseID uint64) ([]model.Billing, error) {
+// List 分页查询账单；memberID > 0 时仅返回该用户为成员的案件账单。
+func (s *BillingService) List(page, pageSize int, caseID, clientID uint64, status string, memberID uint64) ([]model.Billing, int64, error) {
+	return s.repo.List(page, pageSize, caseID, clientID, status, memberID)
+}
+
+// ListByCase 查询某案件账单。主办/协办律师可查看，助理不可见账单。
+func (s *BillingService) ListByCase(caseID, userID uint64, role string) ([]model.Billing, error) {
+	if _, _, err := CheckCaseAccess(s.caseRepo, caseID, userID, role, AccessCoLawyer); err != nil {
+		return nil, err
+	}
 	return s.repo.ListByCase(caseID)
 }
 
-// Summary 本月应收/已收/待收汇总。
-func (s *BillingService) Summary() (map[string]float64, error) {
-	sum, err := s.repo.Summary(time.Now())
+// Summary 本月应收/已收/待收汇总；memberID > 0 时仅统计该用户为成员的案件账单。
+func (s *BillingService) Summary(memberID uint64) (map[string]float64, error) {
+	sum, err := s.repo.Summary(time.Now(), memberID)
 	if err != nil {
 		return nil, err
 	}

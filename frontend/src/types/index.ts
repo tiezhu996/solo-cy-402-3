@@ -32,7 +32,24 @@ export interface CaseItem {
   client_id: number
   lead_lawyer_id: number
   co_lawyer_ids: number[]
+  assistant_ids: number[]
   created_at: string
+}
+
+export interface CaseMemberInfo {
+  id: number
+  username: string
+  real_name: string
+  role: string
+}
+
+export interface CaseMembers {
+  lead_lawyer_id: number
+  co_lawyer_ids: number[]
+  assistant_ids: number[]
+  lead_lawyer: CaseMemberInfo
+  co_lawyers: CaseMemberInfo[]
+  assistants: CaseMemberInfo[]
 }
 
 export interface DocumentItem {

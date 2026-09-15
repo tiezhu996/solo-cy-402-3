@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS cases (
   client_id BIGINT NOT NULL,
   lead_lawyer_id BIGINT NOT NULL,
   co_lawyer_ids JSONB NOT NULL DEFAULT '[]',
+  assistant_ids JSONB NOT NULL DEFAULT '[]',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE cases ADD CONSTRAINT uni_cases_case_no UNIQUE (case_no);
@@ -76,20 +77,21 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 预置种子数据（密码：admin/Admin@123，lawyer 与 assistant/User@123）
+-- 预置种子数据（密码：admin/Admin@123，lawyer、lawyer2 与 assistant/User@123）
 INSERT INTO users (id, username, password_hash, real_name, role, license_no, email, phone, avatar, created_at) VALUES
 (1, 'admin', '$2a$10$bFfMuQAuKWflKxpuDYdFpeGJPVgD83q/.278LHYLL5S0DDmEfChX2', '系统管理员', 'admin', '', 'admin@cylawcase.dev', '13800000001', '', NOW()),
 (2, 'lawyer', '$2a$10$TMTpnDbEwRbtcbF9VJxAxe5IswQjmo7pboKI9zVtU.BYnhzdJpX9a', '张律师', 'lawyer', 'LAW1101010001', 'lawyer@cylawcase.dev', '13800000002', '', NOW()),
-(3, 'assistant', '$2a$10$TMTpnDbEwRbtcbF9VJxAxe5IswQjmo7pboKI9zVtU.BYnhzdJpX9a', '李助理', 'assistant', '', 'assistant@cylawcase.dev', '13800000003', '', NOW());
+(3, 'assistant', '$2a$10$TMTpnDbEwRbtcbF9VJxAxe5IswQjmo7pboKI9zVtU.BYnhzdJpX9a', '李助理', 'assistant', '', 'assistant@cylawcase.dev', '13800000003', '', NOW()),
+(4, 'lawyer2', '$2a$10$TMTpnDbEwRbtcbF9VJxAxe5IswQjmo7pboKI9zVtU.BYnhzdJpX9a', '王律师', 'lawyer', 'LAW1101010002', 'lawyer2@cylawcase.dev', '13800000004', '', NOW());
 
 INSERT INTO clients (id, name, id_number, contact, address, remark, created_at) VALUES
 (1, '深圳华信科技有限公司', '91440300MA5XXXXX1', '王经理 13900000001', '深圳市南山区科技园', '重点客户', NOW()),
 (2, '陈晓明', '440300199001011234', '陈先生 13900000002', '深圳市福田区', '', NOW());
 
-INSERT INTO cases (id, case_no, title, case_type, status, accept_date, close_date, summary, client_id, lead_lawyer_id, co_lawyer_ids, created_at) VALUES
-(1, 'CY20260001', '华信科技买卖合同纠纷', 'commercial', 'investigating', NOW() - INTERVAL '15 days', NULL, '货款催收与合同违约赔偿。', 1, 2, '[3]', NOW()),
-(2, 'CY20260002', '陈晓明民间借贷纠纷', 'civil', 'filed', NOW() - INTERVAL '6 days', NULL, '借款 50 万元及利息追偿。', 2, 2, '[]', NOW()),
-(3, 'CY20260003', '劳动争议仲裁案（已结）', 'labor', 'closed', NOW() - INTERVAL '107 days', NOW() - INTERVAL '27 days', '劳动仲裁已裁决结案。', 2, 2, '[]', NOW());
+INSERT INTO cases (id, case_no, title, case_type, status, accept_date, close_date, summary, client_id, lead_lawyer_id, co_lawyer_ids, assistant_ids, created_at) VALUES
+(1, 'CY20260001', '华信科技买卖合同纠纷', 'commercial', 'investigating', NOW() - INTERVAL '15 days', NULL, '货款催收与合同违约赔偿。', 1, 2, '[4]', '[3]', NOW()),
+(2, 'CY20260002', '陈晓明民间借贷纠纷', 'civil', 'filed', NOW() - INTERVAL '6 days', NULL, '借款 50 万元及利息追偿。', 2, 2, '[]', '[]', NOW()),
+(3, 'CY20260003', '劳动争议仲裁案（已结）', 'labor', 'closed', NOW() - INTERVAL '107 days', NOW() - INTERVAL '27 days', '劳动仲裁已裁决结案。', 2, 2, '[]', '[]', NOW());
 
 INSERT INTO documents (id, title, file_type, file_url, upload_time, case_id, uploader_id, created_at) VALUES
 (1, '民事起诉状', 'complaint', '/uploads/case1_complaint.pdf', NOW(), 1, 2, NOW()),

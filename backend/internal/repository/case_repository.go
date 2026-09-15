@@ -40,11 +40,11 @@ func (r *CaseRepository) FindByID(id uint64) (*model.Case, error) {
 	return &c, nil
 }
 
-// List 分页查询案件，支持类型/状态/律师/时间范围筛选。
-func (r *CaseRepository) List(page, pageSize int, caseType, status string, lawyerID uint64, startDate, endDate *time.Time) ([]model.Case, int64, error) {
+// List 分页查询案件，支持类型/状态/律师/时间范围筛选；memberID > 0 时仅返回该用户为成员的案件。
+func (r *CaseRepository) List(page, pageSize int, caseType, status string, lawyerID, memberID uint64, startDate, endDate *time.Time) ([]model.Case, int64, error) {
 	var list []model.Case
 	var total int64
-	q := r.db.Model(&model.Case{})
+	q := r.db.Model(&model.Case{}).Scopes(ScopeCaseMember(memberID))
 	if caseType != "" {
 		q = q.Where("case_type = ?", caseType)
 	}
@@ -83,6 +83,15 @@ func (r *CaseRepository) ListByLawyer(lawyerID uint64) ([]model.Case, error) {
 	var list []model.Case
 	if err := r.db.Where("lead_lawyer_id = ?", lawyerID).Order("id DESC").Find(&list).Error; err != nil {
 		return nil, fmt.Errorf("list cases by lawyer: %w", err)
+	}
+	return list, nil
+}
+
+// ListMemberCasesByClient 查询某客户下、指定用户可见（为成员）的案件；memberID 为 0 时返回该客户全部案件。
+func (r *CaseRepository) ListMemberCasesByClient(clientID, memberID uint64) ([]model.Case, error) {
+	var list []model.Case
+	if err := r.db.Scopes(ScopeCaseMember(memberID)).Where("client_id = ?", clientID).Order("id DESC").Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("list member cases by client: %w", err)
 	}
 	return list, nil
 }

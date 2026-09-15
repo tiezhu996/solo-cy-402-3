@@ -5,6 +5,7 @@ import { createClient, deleteClient, getClient } from '@/api/client'
 import { useClientStore } from '@/stores/clientStore'
 import ClientCard from '@/components/common/ClientCard'
 import CaseTable from '@/components/common/CaseTable'
+import PermissionGuard from '@/components/common/PermissionGuard'
 import type { Client, CaseItem } from '@/types'
 
 export default function Clients() {
@@ -49,7 +50,9 @@ export default function Clients() {
     <Card>
       <Space style={{ marginBottom: 16 }}>
         <Input.Search placeholder="检索客户姓名/证件号" allowClear style={{ width: 260 }} onSearch={(v) => { setKeyword(v); setPage(1) }} />
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建客户</Button>
+        <PermissionGuard roles={['admin', 'lawyer']}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>新建客户</Button>
+        </PermissionGuard>
       </Space>
       <Table<Client>
         rowKey="id"
@@ -66,7 +69,9 @@ export default function Clients() {
             render: (_, row) => (
               <>
                 <a onClick={() => showDetail(row.id)}>详情</a>
-                <Button type="link" danger onClick={() => onDelete(row.id)}>删除</Button>
+                <PermissionGuard roles={['admin', 'lawyer']}>
+                  <Button type="link" danger onClick={() => onDelete(row.id)}>删除</Button>
+                </PermissionGuard>
               </>
             ),
           },

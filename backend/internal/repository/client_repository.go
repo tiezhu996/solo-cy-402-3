@@ -39,11 +39,15 @@ func (r *ClientRepository) FindByID(id uint64) (*model.Client, error) {
 	return &c, nil
 }
 
-// List 分页查询客户，支持关键词检索。
-func (r *ClientRepository) List(page, pageSize int, keyword string) ([]model.Client, int64, error) {
+// List 分页查询客户，支持关键词检索；memberID > 0 时仅返回该用户为成员的案件所属客户。
+func (r *ClientRepository) List(page, pageSize int, keyword string, memberID uint64) ([]model.Client, int64, error) {
 	var list []model.Client
 	var total int64
 	q := r.db.Model(&model.Client{})
+	if memberID > 0 {
+		sub := r.db.Model(&model.Case{}).Select("client_id").Scopes(ScopeCaseMember(memberID))
+		q = q.Where("id IN (?)", sub)
+	}
 	if keyword != "" {
 		q = q.Where("name LIKE ? OR contact LIKE ? OR id_number LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
 	}

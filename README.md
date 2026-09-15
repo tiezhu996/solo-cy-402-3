@@ -21,8 +21,9 @@ docker compose up -d --build
 | 用户名 | 密码 | 角色 |
 | --- | --- | --- |
 | admin | Admin@123 | 管理员 |
-| lawyer | User@123 | 律师 |
-| assistant | User@123 | 助理 |
+| lawyer | User@123 | 律师（案件 1/2 主办） |
+| lawyer2 | User@123 | 律师（案件 1 协办） |
+| assistant | User@123 | 助理（案件 1 成员） |
 
 ## 本地开发
 
@@ -137,6 +138,8 @@ cy-402/
 | GET | /api/v1/users/me | 当前登录用户信息 |
 | PUT | /api/v1/users/me | 修改个人资料 |
 | GET | /api/v1/users | 用户列表（仅管理员） |
+| GET | /api/v1/users/lawyers | 律师列表（成员候选） |
+| GET | /api/v1/users/assistants | 助理列表（成员候选） |
 | GET | /api/v1/clients | 客户分页列表 |
 | POST | /api/v1/clients | 新建客户 |
 | GET | /api/v1/clients/:id | 客户详情与历史案件 |
@@ -146,8 +149,10 @@ cy-402/
 | POST | /api/v1/cases | 创建案件 |
 | GET | /api/v1/cases/:id | 案件详情 |
 | PUT | /api/v1/cases/:id | 更新案件 |
-| POST | /api/v1/cases/:id/status | 案件状态流转 |
-| POST | /api/v1/cases/:id/assign | 分配主办律师 |
+| POST | /api/v1/cases/:id/status | 案件状态流转（管理员/主办律师） |
+| POST | /api/v1/cases/:id/assign | 主办律师交接（管理员/现任主办，管理权同步转移） |
+| GET | /api/v1/cases/:id/members | 案件成员视图（案件成员可见） |
+| PUT | /api/v1/cases/:id/members | 调整协办律师/助理（管理员/主办律师，立即生效） |
 | GET | /api/v1/documents | 文档中心分页列表 |
 | POST | /api/v1/documents | 上传文档记录 |
 | GET | /api/v1/documents/by-case/:id | 按案件查询文档 |
@@ -166,10 +171,31 @@ cy-402/
 
 - 客户管理：新建/编辑/检索客户，查看历史案件。
 - 案件管理：创建案件、状态流转（立案→调查→庭审→结案→归档）、律师分配、筛选查询。
+- 协作成员管理：主办律师 + 协办律师 + 助理三级成员模型，管理员/主办律师可调整成员与交接主办，调整立即生效。
 - 文档归档：按案件上传/查看/删除文档（起诉状/答辩状/证据/判决书/合同等）。
 - 费用结算：创建账单、标记支付、开票、作废，本月应收/已收/待收汇总。
 - 审计日志：写操作自动记录（管理员查看）。
-- 角色权限：JWT + RBAC（admin/lawyer/assistant）。
+- 角色权限：JWT + RBAC（admin/lawyer/assistant）+ 案件成员访问控制。
+
+## 协作成员与访问控制
+
+案件成员关系：`lead_lawyer_id`（主办律师）+ `co_lawyer_ids`（协办律师，JSONB）+ `assistant_ids`（助理，JSONB）。管理员不参与成员关系，默认全局访问。
+
+| 能力 | 管理员 | 主办律师 | 协办律师 | 助理成员 | 非成员 |
+| --- | --- | --- | --- | --- | --- |
+| 查看案件/客户/文档 | ✅ 全部 | ✅ | ✅ | ✅ | ❌ |
+| 查看账单 | ✅ 全部 | ✅ | ✅ | ❌ | ❌ |
+| 维护文档（上传/删除） | ✅ | ✅ | ✅ | ❌ | ❌ |
+| 维护账单（创建/支付/开票/作废） | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 调整成员 / 交接主办 / 流转状态 | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+规则要点：
+
+- 案件列表、详情、文档、账单、客户资料均按成员关系过滤；非成员不可见，管理员保留全局访问。
+- 成员调整（`PUT /cases/:id/members`）与主办交接（`POST /cases/:id/assign`）即时生效：权限判定逐请求读取数据库，被移除者下一请求即失去访问，新增成员立即获得对应权限；交接后管理权随 `lead_lawyer_id` 一并转移。
+- 协办律师可维护文档、查看账单，但不能调整成员与案件状态；助理仅能查看案件/客户/文档，账单接口对其整体关闭（路由级 403）。
+- 后端统一判定入口：`service/case_access.go`（`CaseAccessLevel` + `CheckCaseAccess`）+ `repository/case_access.go`（`ScopeCaseMember` 列表过滤）；前端对应 `hooks/usePermission.ts`（`caseRelation` 与 `can*` 系列）。
+- 历史数据迁移：启动时 `repository/migration.go` 自动把混在 `co_lawyer_ids` 中的助理成员迁到 `assistant_ids`（幂等）。
 
 ## License
 

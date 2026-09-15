@@ -118,6 +118,11 @@ func (s *UserService) ListLawyers() ([]model.User, error) {
 	return s.repo.ListLawyers()
 }
 
+// ListAssistants 助理列表（用于案件成员管理）。
+func (s *UserService) ListAssistants() ([]model.User, error) {
+	return s.repo.ListByRole(constants.RoleAssistant)
+}
+
 // List 用户列表（管理员）。
 func (s *UserService) List(page, pageSize int) ([]model.User, int64, error) {
 	return s.repo.List(page, pageSize)

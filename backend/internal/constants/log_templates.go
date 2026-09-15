@@ -24,6 +24,8 @@ const (
 	LogDocumentUploadFailed    = "document upload failed"
 	LogDocumentDeleteSuccess   = "document delete success"
 	LogDocumentDownloadSuccess = "document download success"
+	LogDocumentFileMissing     = "document file missing"
+	LogSeedDocumentBackfill    = "seed document backfill"
 	LogBillingCreateSuccess    = "billing create success"
 	LogBillingCreateFailed     = "billing create failed"
 	LogBillingPaidSuccess      = "billing paid success"

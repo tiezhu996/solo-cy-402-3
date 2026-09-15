@@ -41,8 +41,13 @@ func main() {
 		logger.Error("case member migration failed", "error", err.Error())
 		os.Exit(1)
 	}
-	if err := service.NewSeedService(db, logger).Seed(); err != nil {
+	seedSvc := service.NewSeedService(db, cfg.UploadDir, logger)
+	if err := seedSvc.Seed(); err != nil {
 		logger.Error("seed failed", "error", err.Error())
+		os.Exit(1)
+	}
+	if err := seedSvc.SeedPresetDocuments(); err != nil {
+		logger.Error("seed preset documents failed", "error", err.Error())
 		os.Exit(1)
 	}
 

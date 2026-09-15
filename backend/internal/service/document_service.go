@@ -2,6 +2,7 @@ package service
 
 import (
 	"log/slog"
+	"os"
 	"time"
 
 	"cylawcase/internal/constants"
@@ -64,6 +65,12 @@ func (s *DocumentService) Download(id, userID uint64, role string) (string, erro
 	path, err := util.ResolveUploadPath(s.uploadDir, d.FileURL)
 	if err != nil {
 		return "", util.Wrap(err, "Document[id=%d] download resolve failed", id)
+	}
+	// 文件缺失返回稳定失败结果（统一 JSON 404），而不是 http.ServeFile 的纯文本 404。
+	if _, err := os.Stat(path); err != nil {
+		s.logger.Warn(constants.LogDocumentFileMissing, "document_id", id, "path", path)
+		return "", util.NewAppError(constants.CodeNotFound,
+			constants.MsgFileNotFound+"（Document[id="+u64(id)+"] download: file missing）")
 	}
 	s.logger.Info(constants.LogDocumentDownloadSuccess, "document_id", id, "user_id", userID)
 	return path, nil
